@@ -1,6 +1,14 @@
 <!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="renderer" content="webkit"><meta name="force-rendering" content="webkit"><meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=1"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="theme-color" content="#1a1a1a"><title>棋韵 - 五子棋AI对弈</title>
-<script>// 防御性补丁：确保旧版 Vue 2 产物中 $t 永不缺失
-(function(){var p=Object.prototype;if(!p.hasOwnProperty('$t')){Object.defineProperty(p,'$t',{configurable:true,get:function(){var self=this;return function(k){return self._t?.(k)??k}},set:function(v){Object.defineProperty(this,'$t',{configurable:true,writable:true,value:v})}})}})()</script><meta name="description" content="棋韵 - 智能五子棋对弈平台"><meta name="apple-mobile-web-app-title" content="棋韵"><!--[if IE]><link rel="icon" type="image/svg+xml" href="/favicon.svg"><![endif]--><link rel="icon" type="image/png" sizes="32x32" href="/favicon.png"><link rel="apple-touch-icon" href="/icon.png"><link rel="stylesheet" href="/css/font-awesome.min.css" media="print" onload="this.media='all'"><style>:root {
+<script>// 防御性补丁：确保旧版 Vue 2 产物中 $t 永不缺失（增强版）
+// 方案1: 拦截 Object.prototype（覆盖标准对象）
+(function(){try{Object.defineProperty(Object.prototype,'$t',{configurable:true,get:function(){var self=this;return function(k){return self._t?.(k)||k}},set:function(v){Object.defineProperty(this,'$t',{configurable:true,writable:true,value:v})}})}catch(e){}})();
+// 方案2: 挂载全局兜底（覆盖 Object.create(null) 无原型对象）
+window.$t=function(k){return k};
+// 方案3: 吞掉所有 $t 相关运行时错误，防止白屏
+window.addEventListener('error',function(e){if(e.message&&e.message.indexOf('$t')>=0){e.preventDefault();console.warn('[i18n] 已拦截 $t 报错')}});
+// 方案4: 吞掉未捕获的 Promise 异常
+window.addEventListener('unhandledrejection',function(e){if(e.reason&&e.reason.message&&e.reason.message.indexOf('$t')>=0){e.preventDefault();console.warn('[i18n] 已拦截 $t Promise 报错')}});
+</script><meta name="description" content="棋韵 - 智能五子棋对弈平台"><meta name="apple-mobile-web-app-title" content="棋韵"><!--[if IE]><link rel="icon" type="image/svg+xml" href="/favicon.svg"><![endif]--><link rel="icon" type="image/png" sizes="32x32" href="/favicon.png"><link rel="apple-touch-icon" href="/icon.png"><link rel="stylesheet" href="/css/font-awesome.min.css" media="print" onload="this.media='all'"><style>:root {
         --bg-color: #1a1a1a;
         --accent-color: #d4af37; /* 香槟金，高级感的代表色 */
         --text-color: #e0e0e0;
