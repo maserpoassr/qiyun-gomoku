@@ -215,6 +215,10 @@ watch([board, currentPlayer, gameOver], () => drawBoard(), { deep: true });
 
 onMounted(() => {
   initCanvas();
+  // 接管 worker 引用
+  if (window.__rapfiWorker) {
+    setEngine(window.__rapfiWorker, 'worker');
+  }
 });
 
 onUnmounted(() => {});

@@ -13,11 +13,15 @@ setTimeout(async () => {
     });
 
     app.config.globalProperties.$engine = result;
+    // 暴露 worker 引用以便 useGame 发指令
+    window.__rapfiWorker = result.worker;
+    window.__rapfiEngine = result;
     window.dispatchEvent(new CustomEvent('engine-ready', {
       detail: {
         variant: result.variant,
         multiThread: result.multiThread,
         hasWorker: result.worker !== null,
+        worker: result.worker,
       },
     }));
   } catch (err) {
