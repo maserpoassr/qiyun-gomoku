@@ -1,1 +1,0 @@
-{"rules":[{"allowed":{"origins":["http://localhost:*","https://*.qiyun-gomoku.pages.dev","https://5.hfive.ggff.net"],"methods":["GET","HEAD"],"headers":["Range","Content-Type"]},"exposeHeaders":["Accept-Ranges","Content-Range","Content-Length","ETag"],"maxAgeSeconds":86400}]}
