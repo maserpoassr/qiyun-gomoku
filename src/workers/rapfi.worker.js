@@ -19,29 +19,21 @@ self.Module = {
   },
 };
 
-// 2. 装载底层引擎（多线程优先，逐级降级）
-(function () {
-  const variants = [
-    '/build/rapfi-multi-simd128.js',
-    '/build/rapfi-multi.js',
-    '/build/rapfi-single-simd128.js',
-    '/build/rapfi-single.js',
-  ];
-  for (const url of variants) {
-    try {
-      self.importScripts(url);
-      if (typeof self.Rapfi !== 'undefined') {
-        console.log('[Worker] 引擎装载成功:', url);
-        return;
-      }
-    } catch (e) {
-      console.warn('[Worker] 变体加载失败:', url, e.message);
-    }
+// 2. 同步装载底层引擎胶水代码
+try {
+  importScripts('/build/rapfi-multi-simd128.js');
+} catch (e) {
+  try {
+    importScripts('/build/rapfi-single.js');
+  } catch (e2) {
+    console.error('[Worker] 所有引擎变体均加载失败');
   }
-  console.error('[Worker] 所有引擎变体均加载失败');
-})();
+}
 
-// 3. 初始化引擎实例
+// 3. 【核心】保存 Emscripten 原生的消息处理器（用于管理多线程 Pthreads）
+const emscriptenOnMessage = self.onmessage;
+
+// 4. 初始化引擎实例（在 importScripts 完成后执行）
 let rapfi = null;
 
 if (typeof self.Rapfi !== 'undefined') {
@@ -62,36 +54,44 @@ if (typeof self.Rapfi !== 'undefined') {
   self.postMessage({ type: 'error', data: 'Rapfi 构造函数未定义' });
 }
 
-// 4. 双协议兼容通信（核心修复）
+// 5. 【核心修复】安全钩子拦截器 — 不阻塞 Pthread 内部信号
 self.onmessage = function (event) {
   const data = event.data;
   if (!data) return;
 
-  // 【核心】提取指令字符串：兼容 字符串直接传输 / {cmd} / {type,data} / {type,cmd}
+  // 判定是否为我们派发的五子棋游戏指令
   let cmdStr = '';
 
   if (typeof data === 'string') {
-    cmdStr = data;
+    // 我们的指令以 YX / GO / INFO 开头
+    if (data.startsWith('YX') || data === 'GO' || data.startsWith('INFO')) {
+      cmdStr = data;
+    }
   } else if (data.cmd) {
     cmdStr = data.cmd;
   } else if (data.data && typeof data.data === 'string') {
-    cmdStr = data.data; // { type: 'command', data: 'GO' }
-  } else if (data.type === 'command' && data.msg) {
-    cmdStr = data.msg;
+    if (
+      data.data.startsWith('YX') ||
+      data.data === 'GO' ||
+      data.data.startsWith('INFO')
+    ) {
+      cmdStr = data.data;
+    }
   }
 
   if (cmdStr) {
+    // 游戏指令，喂给 WASM 引擎
     if (rapfi && rapfi.sendCommand) {
       rapfi.sendCommand(cmdStr);
     } else if (self.Module && self.Module.ccall) {
       self.Module.ccall('Command', 'void', ['string'], [cmdStr]);
     } else {
-      console.warn('[Worker] 引擎未就绪，漏掉指令:', cmdStr);
+      console.warn('[Worker] 引擎未就绪，暂存指令:', cmdStr);
     }
   } else {
-    // 忽略调试消息
-    if (data.type !== 'ping' && data.type !== 'ready' && data.type !== 'stdout' && data.type !== 'stderr' && data.type !== 'error') {
-      console.log('[Worker] 忽略未知格式消息:', JSON.stringify(data).slice(0, 100));
+    // 非游戏指令 → 原封不动转发给 Emscripten 原生处理器（Pthread 信号等）
+    if (emscriptenOnMessage) {
+      emscriptenOnMessage(event);
     }
   }
 };
