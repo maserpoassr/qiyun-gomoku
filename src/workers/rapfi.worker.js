@@ -3,9 +3,10 @@
 // 状态控制
 let isWasmReady = false;
 const commandQueue = [];
+let rapfi = null;
 
 function executeQueue() {
-  if (!isWasmReady || !self.Module.ccall) return;
+  if (!isWasmReady || !rapfi?.sendCommand) return;
   while (commandQueue.length > 0) {
     const cmd = commandQueue.shift();
     callEngine(cmd);
@@ -13,14 +14,10 @@ function executeQueue() {
 }
 
 function callEngine(cmdStr) {
-  try {
-    self.Module.ccall('sendCommand', 'void', ['string'], [cmdStr]);
-  } catch (e) {
-    try {
-      self.Module.ccall('Command', 'void', ['string'], [cmdStr]);
-    } catch (err) {
-      console.error('[Worker] 引擎调用失败:', cmdStr, err);
-    }
+  if (typeof rapfi?.sendCommand === 'function') {
+    rapfi.sendCommand(cmdStr);
+  } else {
+    console.warn('[Worker] 引擎未就绪:', cmdStr);
   }
 }
 
@@ -73,10 +70,10 @@ if (typeof self.Rapfi !== 'undefined') {
   self.Rapfi({
     locateFile: self.Module.locateFile,
     onReceiveStdout: function (text) {
-      self.postMessage({ type: 'stdout', msg: text });
+      self.postMessage({ type: 'stdout', data: text });
     },
     onReceiveStderr: function (text) {
-      self.postMessage({ type: 'stderr', msg: text });
+      self.postMessage({ type: 'stderr', data: text });
     },
     setStatus: function (text) {
       if (text === 'Running...' || text === '') return;
@@ -85,7 +82,8 @@ if (typeof self.Rapfi !== 'undefined') {
     onExit: function (code) {
       self.postMessage({ type: 'exit', data: code });
     },
-  }).then(function () {
+  }).then(function (instance) {
+    rapfi = instance;
     if (!isWasmReady) {
       isWasmReady = true;
       self.postMessage({ type: 'ready' });
@@ -128,7 +126,8 @@ self.onmessage = function (event) {
   }
 
   if (isGameCommand && cmdStr) {
-    if (isWasmReady && self.Module.ccall) {
+    self.postMessage({ type: 'debug', data: '收到指令: ' + cmdStr });
+    if (isWasmReady && rapfi?.sendCommand) {
       callEngine(cmdStr);
     } else {
       commandQueue.push(cmdStr);

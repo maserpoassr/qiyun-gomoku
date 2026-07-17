@@ -79,8 +79,21 @@ export function useGame() {
   function triggerAI() {
     if (aiThinking.value || gameOver.value) return;
     aiThinking.value = true;
+
+    // 必须先发送 INFO 配置，引擎才能处理后续指令
+    sendInfo('RULE', '0');           // 无禁手
+    sendInfo('THREAD_NUM', '1');     // 单线程
+    sendInfo('CAUTION_FACTOR', '3'); // 选点范围三圈半
+    sendInfo('STRENGTH', '100');     // 满棋力
+    sendInfo('TIMEOUT_TURN', '10');  // 步时 10 秒
+    sendInfo('TIMEOUT_MATCH', '300');// 局时 300 秒
+    sendInfo('MAX_DEPTH', '64');     // 最大深度
+    sendInfo('MAX_NODE', '1000000'); // 最大节点
+    sendInfo('SHOW_DETAIL', '2');    // 详细输出
+    sendInfo('PONDERING', '0');      // 关闭后台思考
+    sendInfo('SWAPABLE', '0');       // 不允许交换
+
     sendBoard();
-    // 先停止旧搜索，再开始新搜索
     sendCommand('YXSTOP');
     // 微任务队列确保 YXSTOP 先到达
     setTimeout(() => sendCommand('GO'), 0);
@@ -219,7 +232,7 @@ export function useGame() {
         sendCommand('YXSTOP');
         aiThinking.value = false;
         reject(new Error('AI 思考超时'));
-      }, 60000); // 60 秒超时
+        }, 120000); // 120 秒超时（单线程首次思考可能较慢）
     });
   }
 
@@ -297,10 +310,12 @@ export function useGame() {
       worker.onmessage = (e) => {
         const { type, data } = e.data;
         if (type === 'stdout') {
-          feedEngineOutput(data);
-        } else if (type === 'stderr') {
-          console.error('[Rapfi]', data);
-        }
+              feedEngineOutput(data);
+            } else if (type === 'stderr') {
+              console.error('[Rapfi]', data);
+            } else if (type === 'debug') {
+              console.log('[Worker Debug]', data);
+            }
       };
     }
   }
