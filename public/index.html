@@ -4,6 +4,8 @@
 (function(){try{Object.defineProperty(Object.prototype,'$t',{configurable:true,get:function(){var self=this;return function(k){return self._t?.(k)||k}},set:function(v){Object.defineProperty(this,'$t',{configurable:true,writable:true,value:v})}})}catch(e){}})();
 // 方案2: 挂载全局兜底（覆盖 Object.create(null) 无原型对象）
 window.$t=function(k){return k};
+// 方案2b: Vue 原型拦截（针对 VUX 组件解构覆写）
+if(window.Vue){try{window.Vue.prototype.$t=function(k){return k}}catch(e){}}
 // 方案3: 吞掉所有 $t 相关运行时错误，防止白屏
 window.addEventListener('error',function(e){if(e.message&&e.message.indexOf('$t')>=0){e.preventDefault();console.warn('[i18n] 已拦截 $t 报错')}});
 // 方案4: 吞掉未捕获的 Promise 异常
