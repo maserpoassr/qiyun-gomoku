@@ -62,9 +62,9 @@ function pickVariant(caps) {
 function tryWorkerVariant(variant, modelURL, onProgress) {
   return new Promise((resolve, reject) => {
     // Vite 语法：new URL() 会在构建时被静态分析，保证 Worker 路径正确
+    // 注意：不能使用 {type:'module'} — importScripts() 仅在 classic worker 中可用
     const worker = new Worker(
-      new URL('../workers/rapfi.worker.js', import.meta.url),
-      { type: 'module' }
+      new URL('../workers/rapfi.worker.js', import.meta.url)
     );
 
     const timeout = setTimeout(() => {

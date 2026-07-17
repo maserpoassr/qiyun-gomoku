@@ -39,5 +39,8 @@ body,html{margin:0;padding:0;height:100%;background-color:var(--bg-dark);font-fa
 
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-WSNZ3J3X2V"></script>
 <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','G-WSNZ3J3X2V')</script>
+
+<!-- 注销旧 Service Worker（旧版 Webpack 产物的缓存） -->
+<script>navigator.serviceWorker?.getRegistrations().then(r=>r.forEach(s=>{s.unregister();console.log('[SW] 旧 Service Worker 已注销')}))</script>
 </body>
 </html>
