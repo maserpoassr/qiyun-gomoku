@@ -7,6 +7,21 @@
 
 let rapfi = null;
 
+// ─── 全局路径拦截器 ───
+// Emscripten 引擎在加载 rapfi-*.js 前通过 Module.locateFile 寻址
+// 必须在 importScripts 之前设置，引擎初始化时自动读取
+self.Module = self.Module || {};
+self.Module.locateFile = function(path, scriptDirectory) {
+  if (path.endsWith('.data')) {
+    // 40MB 权重文件 → 指向 Pages Function 代理
+    return '/model/rapfi.data';
+  }
+  if (path.endsWith('.wasm')) {
+    return '/build/' + path;
+  }
+  return scriptDirectory + path;
+};
+
 // 收到主线程消息
 self.onmessage = async function (e) {
   const { type, data } = e.data;

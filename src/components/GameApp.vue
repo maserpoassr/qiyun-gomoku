@@ -35,7 +35,8 @@
     <!-- 棋盘 -->
     <div class="board-stage">
       <div class="board-container">
-        <canvas ref="boardCanvas" :width="canvasSize" :height="canvasSize"
+        <canvas ref="boardCanvas" width="600" height="600"
+          style="background-color:#EDC9A2;display:block"
           @click="handleClick" @touchstart.prevent="handleTouch" />
       </div>
     </div>
@@ -185,6 +186,13 @@ watch([board, currentPlayer, gameOver], () => drawBoard(), { deep: true });
 let _resizeHandler = null;
 
 onMounted(() => {
+  // 闪光弹测试：确保 Canvas API 可用
+  if (boardCanvas.value) {
+    const ctx = boardCanvas.value.getContext('2d');
+    ctx.fillStyle = '#EDC9A2';
+    ctx.fillRect(0, 0, 600, 600);
+  }
+
   _resizeHandler = () => {
     const mx = Math.min(window.innerWidth - 32, window.innerHeight - 180, 560);
     canvasSize.value = Math.max(240, mx);
