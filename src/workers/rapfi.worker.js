@@ -64,7 +64,7 @@ self.Module.onRuntimeInitialized = function () {
 };
 
 // ==========================================
-// 加载引擎核心
+// 加载引擎核心 + 显式初始化 WASM
 // ==========================================
 try {
   importScripts('/build/rapfi-multi-simd128.js');
@@ -74,6 +74,21 @@ try {
   } catch (err) {
     console.error('[Worker] 所有引擎加载失败');
   }
+}
+
+// 【关键】显式调用 Rapfi() 初始化 WASM 运行时
+// importScripts 只加载胶水代码，不启动 WASM 编译
+if (typeof self.Rapfi !== 'undefined') {
+  self.Rapfi({
+    locateFile: self.Module.locateFile,
+    print: self.Module.print,
+    printErr: self.Module.printErr,
+  }).catch(function (err) {
+    console.error('[Worker] Rapfi 初始化失败:', err);
+    self.postMessage({ type: 'error', data: err.message });
+  });
+} else {
+  self.postMessage({ type: 'error', data: 'Rapfi 构造函数未定义' });
 }
 
 // ==========================================
