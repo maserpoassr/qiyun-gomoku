@@ -25,13 +25,10 @@ function callEngine(cmdStr) {
 }
 
 // ==========================================
-// 【核心修复】安全初始化 self.Module，严禁覆盖原有属性
-// Emscripten 在多线程模式下会预注入线程配置（thread ID、pthread 句柄等）
-// 直接自赋值会清空这些参数，导致子线程死锁
+// 安全初始化 self.Module，保护线程上下文
 // ==========================================
 self.Module = self.Module || {};
 
-// 安全包装 locateFile
 const origLocateFile = self.Module.locateFile;
 self.Module.locateFile = function (path, scriptDirectory) {
   if (path.endsWith('.data')) return '/model/rapfi.data';
@@ -41,7 +38,6 @@ self.Module.locateFile = function (path, scriptDirectory) {
     : (scriptDirectory || '/build/') + path;
 };
 
-// 安全包装输出流
 const origPrint = self.Module.print;
 self.Module.print = function (text) {
   self.postMessage({ type: 'stdout', msg: text });
@@ -54,7 +50,6 @@ self.Module.printErr = function (text) {
   if (origPrintErr) origPrintErr(text);
 };
 
-// 安全包装初始化完成回调
 const origOnInit = self.Module.onRuntimeInitialized;
 self.Module.onRuntimeInitialized = function () {
   isWasmReady = true;
@@ -64,20 +59,16 @@ self.Module.onRuntimeInitialized = function () {
 };
 
 // ==========================================
-// 加载引擎核心 + 显式初始化 WASM
+// 【核心】只加载单线程引擎 — 零 pthread 依赖
+// rapfi-single.js 不会创建子 Worker，兼容所有浏览器环境
 // ==========================================
 try {
-  importScripts('/build/rapfi-multi-simd128.js');
-} catch (e) {
-  try {
-    importScripts('/build/rapfi-single.js');
-  } catch (err) {
-    console.error('[Worker] 所有引擎加载失败');
-  }
+  importScripts('/build/rapfi-single.js');
+} catch (err) {
+  console.error('[Worker] 单线程引擎加载失败:', err);
 }
 
-// 【关键】显式调用 Rapfi() 初始化 WASM 运行时
-// 使用旧版兼容的 callback 命名（onReceiveStdout/Stderr, setStatus）
+// 初始化 WASM
 if (typeof self.Rapfi !== 'undefined') {
   self.Rapfi({
     locateFile: self.Module.locateFile,
@@ -106,16 +97,14 @@ if (typeof self.Rapfi !== 'undefined') {
   // 安全兜底
   setTimeout(function () {
     if (!isWasmReady) {
-      self.postMessage({ type: 'error', data: 'Worker WASM 初始化超时（60s）' });
+      self.postMessage({ type: 'error', data: 'Worker WASM 初始化超时' });
     }
   }, 60000);
 } else {
   self.postMessage({ type: 'error', data: 'Rapfi 构造函数未定义' });
 }
 
-// ==========================================
-// 安全包装消息接收器，保留子线程同步通道
-// ==========================================
+// 安全钩子：非游戏指令转发给 Emscripten 原生处理器
 const emscriptenOnMessage = self.onmessage;
 
 self.onmessage = function (event) {
@@ -145,7 +134,6 @@ self.onmessage = function (event) {
       commandQueue.push(cmdStr);
     }
   } else {
-    // 子线程同步信号等，原封不动交还给 Emscripten
     if (emscriptenOnMessage) {
       emscriptenOnMessage(event);
     }
