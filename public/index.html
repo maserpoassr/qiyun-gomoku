@@ -1,86 +1,52 @@
-<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="renderer" content="webkit"><meta name="force-rendering" content="webkit"><meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=1"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="theme-color" content="#1a1a1a"><title>棋韵 - 五子棋AI对弈</title>
-<script>// 防御性补丁：确保旧版 Vue 2 产物中 $t 永不缺失（增强版）
-// 方案1: 拦截 Object.prototype（覆盖标准对象）
+<!DOCTYPE html><html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="renderer" content="webkit">
+<meta name="force-rendering" content="webkit">
+<meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1a1a1a">
+<title>棋韵 - 五子棋AI对弈</title>
+<script>// 防御性补丁：确保旧版 Vue 2 产物中 $t 永不缺失（终极版）
+// 方案1: Object.prototype 拦截
 (function(){try{Object.defineProperty(Object.prototype,'$t',{configurable:true,get:function(){var self=this;return function(k){return self._t?.(k)||k}},set:function(v){Object.defineProperty(this,'$t',{configurable:true,writable:true,value:v})}})}catch(e){}})();
-// 方案2: 挂载全局兜底（覆盖 Object.create(null) 无原型对象）
+// 方案2: 全局兜底
 window.$t=function(k){return k};
-// 方案2b: Vue 原型拦截（针对 VUX 组件解构覆写）
-if(window.Vue){try{window.Vue.prototype.$t=function(k){return k}}catch(e){}}
-// 方案3: 吞掉所有 $t 相关运行时错误，防止白屏
+// 方案3: 吞掉 $t 相关运行时错误
 window.addEventListener('error',function(e){if(e.message&&e.message.indexOf('$t')>=0){e.preventDefault();console.warn('[i18n] 已拦截 $t 报错')}});
-// 方案4: 吞掉未捕获的 Promise 异常
 window.addEventListener('unhandledrejection',function(e){if(e.reason&&e.reason.message&&e.reason.message.indexOf('$t')>=0){e.preventDefault();console.warn('[i18n] 已拦截 $t Promise 报错')}});
-</script><meta name="description" content="棋韵 - 智能五子棋对弈平台"><meta name="apple-mobile-web-app-title" content="棋韵"><!--[if IE]><link rel="icon" type="image/svg+xml" href="/favicon.svg"><![endif]--><link rel="icon" type="image/png" sizes="32x32" href="/favicon.png"><link rel="apple-touch-icon" href="/icon.png"><link rel="stylesheet" href="/css/font-awesome.min.css" media="print" onload="this.media='all'"><style>:root {
-        --bg-color: #1a1a1a;
-        --accent-color: #d4af37; /* 香槟金，高级感的代表色 */
-        --text-color: #e0e0e0;
-      }
-      
-      body, html {
-        margin: 0;
-        padding: 0;
-        height: 100%;
-        background-color: var(--bg-color);
-        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-        overflow: hidden;
-        -webkit-font-smoothing: antialiased;
-      }
+</script>
+<meta name="description" content="棋韵 - 智能五子棋对弈平台">
+<meta name="apple-mobile-web-app-title" content="棋韵">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
+<link rel="apple-touch-icon" href="/icon.png">
+<link rel="stylesheet" href="/css/font-awesome.min.css" media="print" onload="this.media='all'">
+<style>:root{--bg-color:#1a1a1a;--accent-color:#d4af37;--text-color:#e0e0e0}
+body,html{margin:0;padding:0;height:100%;background-color:var(--bg-color);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased}</style>
+<link href="/css/app.e48d05d7.css" rel="preload" as="style">
+<link href="/css/chunk-vendors.9f0f81a9.css" rel="preload" as="style">
+<link href="/js/app.815f6a6d.js" rel="preload" as="script">
+<link href="/js/chunk-vendors.906392e8.js" rel="preload" as="script">
+<link href="/css/chunk-vendors.9f0f81a9.css" rel="stylesheet">
+<link href="/css/app.e48d05d7.css" rel="stylesheet">
+<link rel="manifest" href="/manifest.json">
+</head>
+<body>
+<noscript><div style="color:#fff;text-align:center;padding-top:50px"><strong>请开启 JavaScript 以获得最佳对弈体验</strong></div></noscript>
 
-      /* 启动屏容器 */
-      #loading-screen {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: radial-gradient(circle at center, #2a2a2a 0%, #1a1a1a 100%);
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        z-index: 9999;
-        transition: opacity 0.5s ease-out;
-      }
+<!-- Vue 3 引擎加载屏（覆盖在 Vue 2 之上） -->
+<div id="gomoku-root"></div>
 
-      /* Logo 区域 */
-      .loader-logo {
-        font-size: 28px;
-        font-weight: 300;
-        color: var(--text-color);
-        margin-bottom: 20px;
-        letter-spacing: 8px;
-      }
-      .loader-logo span {
-        font-weight: 700;
-        color: var(--accent-color);
-      }
+<!-- Vue 2 旧 App 挂载点 -->
+<div id="app"></div>
 
-      /* 极简呼吸灯加载条 */
-      .loader-bar {
-        width: 120px;
-        height: 2px;
-        background: rgba(255,255,255,0.1);
-        position: relative;
-        overflow: hidden;
-        border-radius: 2px;
-      }
-      .loader-bar::after {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        height: 100%;
-        width: 0%;
-        background: var(--accent-color);
-        animation: loading 2s cubic-bezier(0.22, 0.61, 0.36, 1) infinite;
-        box-shadow: 0 0 10px var(--accent-color);
-      }
-
-      @keyframes loading {
-        0% { width: 0%; left: 0; opacity: 1; }
-        50% { width: 100%; left: 0; opacity: 1; }
-        100% { width: 100%; left: 100%; opacity: 0; }
-      }</style><link href="/css/app.e48d05d7.css" rel="preload" as="style"><link href="/css/chunk-vendors.9f0f81a9.css" rel="preload" as="style"><link href="/js/app.815f6a6d.js" rel="preload" as="script"><link href="/js/chunk-vendors.906392e8.js" rel="preload" as="script"><link href="/css/chunk-vendors.9f0f81a9.css" rel="stylesheet"><link href="/css/app.e48d05d7.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="32x32" href="/img/icons/favicon-32x32.png"><link rel="icon" type="image/png" sizes="16x16" href="/img/icons/favicon-16x16.png"><link rel="manifest" href="/manifest.json"><meta name="theme-color" content="#1a1a2e"><meta name="apple-mobile-web-app-capable" content="no"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="apple-mobile-web-app-title" content="Gomoku AI"><link rel="apple-touch-icon" href="/img/icons/apple-touch-icon-152x152.png"><link rel="mask-icon" href="/img/icons/safari-pinned-tab.svg" color="#1a1a2e"><meta name="msapplication-TileImage" content="/img/icons/msapplication-icon-144x144.png"><meta name="msapplication-TileColor" content="#1a1a2e"></head><body><noscript><div style="color: #fff; text-align: center; padding-top: 50px;"><strong>为了获得最佳对弈体验，请开启 JavaScript 支持。</strong></div></noscript><div id="loading-screen"><div class="loader-logo">棋<span>韵</span></div><div class="loader-bar"></div></div><div id="app"></div><script async src="/lib/gif.js"></script><script async src="https://www.googletagmanager.com/gtag/js?id=G-WSNZ3J3X2V"></script><script>window.dataLayer = window.dataLayer || []
-      function gtag() { dataLayer.push(arguments) }
-      gtag('js', new Date())
-      gtag('config', 'G-WSNZ3J3X2V')</script><script src="/js/chunk-vendors.906392e8.js"></script><script src="/js/app.815f6a6d.js"></script></body></html>
+<script async src="/lib/gif.js"></script>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-WSNZ3J3X2V"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','G-WSNZ3J3X2V')</script>
+<script src="/js/chunk-vendors.906392e8.js"></script>
+<script src="/js/app.815f6a6d.js"></script>
+</body>
+</html>
