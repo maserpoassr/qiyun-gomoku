@@ -1,82 +1,81 @@
-/**
- * 棋韵引擎 Worker — Vite 托管，路径解析由构建工具保证
- * 
- * 接收主线程指令，加载 Rapfi WASM 引擎并执行对弈计算
- * 通过 postMessage 返回结果
- */
+// ─── 强制劫持底层 WebAssembly 的文件加载路由 ───
+// 必须在 importScripts 之前设置，引擎初始化时自动读取
+self.Module = {
+  locateFile: function (path, scriptDirectory) {
+    // 强制 40MB 模型文件指向 R2 代理
+    if (path.endsWith('.data')) {
+      return '/model/rapfi.data';
+    }
+    // 强制 WASM 去 /build/ 下找
+    if (path.endsWith('.wasm')) {
+      return '/build/' + path;
+    }
+    return (scriptDirectory || '/build/') + path;
+  },
+  print: function (text) {
+    self.postMessage({ type: 'stdout', data: text });
+  },
+  printErr: function (text) {
+    self.postMessage({ type: 'stderr', data: text });
+  },
+};
 
+// 利用 importScripts 引入挂在 public/build/ 下的原版引擎
+// 不会被 Vite 二次压缩破坏作用域
+(function () {
+  const variants = [
+    '/build/rapfi-multi-simd128.js',
+    '/build/rapfi-multi.js',
+    '/build/rapfi-single-simd128.js',
+    '/build/rapfi-single.js',
+  ];
+  for (const url of variants) {
+    try {
+      self.importScripts(url);
+      if (typeof self.Rapfi !== 'undefined') {
+        console.log('[Worker] 引擎装载成功:', url);
+        return;
+      }
+    } catch (e) {
+      console.warn('[Worker] 变体加载失败:', url, e.message);
+    }
+  }
+  console.error('[Worker] 所有引擎变体均加载失败');
+})();
+
+// 初始化引擎实例（在 importScripts 完成后执行）
 let rapfi = null;
 
-// ─── 全局路径拦截器 ───
-// Emscripten 引擎在加载 rapfi-*.js 前通过 Module.locateFile 寻址
-// 必须在 importScripts 之前设置，引擎初始化时自动读取
-self.Module = self.Module || {};
-self.Module.locateFile = function(path, scriptDirectory) {
-  if (path.endsWith('.data')) {
-    // 40MB 权重文件 → 指向 Pages Function 代理
-    return '/model/rapfi.data';
-  }
-  if (path.endsWith('.wasm')) {
-    return '/build/' + path;
-  }
-  return scriptDirectory + path;
-};
-
-// 收到主线程消息
-self.onmessage = async function (e) {
-  const { type, data } = e.data;
-
-  try {
-    switch (type) {
-      case 'init':
-        await initEngine(data);
-        break;
-      case 'command':
-        if (rapfi && rapfi.sendCommand) {
-          rapfi.sendCommand(data);
-        }
-        break;
-      default:
-        console.warn('[Worker] 未知指令:', type);
-    }
-  } catch (err) {
+if (typeof self.Rapfi !== 'undefined') {
+  self.Rapfi({
+    locateFile: self.Module.locateFile,
+    print: self.Module.print,
+    printErr: self.Module.printErr,
+  }).then(function (instance) {
+    rapfi = instance;
+    self.postMessage({ type: 'ready' });
+  }).catch(function (err) {
+    console.error('[Worker] Rapfi 初始化失败:', err);
     self.postMessage({ type: 'error', data: err.message });
+  });
+} else {
+  self.postMessage({ type: 'error', data: 'Rapfi 构造函数未定义' });
+}
+
+// 接收主线程通信指令
+self.onmessage = function (event) {
+  const data = event.data;
+  if (!data) return;
+
+  switch (data.type) {
+    case 'command':
+      if (rapfi && rapfi.sendCommand) {
+        rapfi.sendCommand(data.cmd);
+      } else if (rapfi && rapfi.ccall) {
+        rapfi.ccall('Command', 'void', ['string'], [data.cmd]);
+      }
+      break;
+    default:
+      console.warn('[Worker] 未知指令:', data.type);
   }
 };
-
-/**
- * 初始化 Rapfi 引擎
- */
-async function initEngine({ variant, modelURL }) {
-  const basePath = `/build/`;
-  const jsURL = `${basePath}rapfi-${variant}.js`;
-
-  // 通过 importScripts 加载 Rapfi 胶水代码
-  self.importScripts(jsURL);
-
-  if (typeof self.Rapfi === 'undefined') {
-    throw new Error(`Rapfi 构造函数未定义 (variant: ${variant})`);
-  }
-
-  // 配置 locateFile — 使用绝对路径，Worker 在任意上下文都能正确解析
-  const locateFile = (filename) => {
-    if (/\.data$/.test(filename)) {
-      return modelURL || `${basePath}rapfi-${variant}.data`;
-    }
-    if (/\.wasm$/.test(filename)) {
-      return `${basePath}rapfi-${variant}.wasm`;
-    }
-    return `${basePath}${filename}`;
-  };
-
-  // 初始化引擎 — 不使用自定义 wasmMemory，Rapfi 内部自动处理
-  rapfi = await self.Rapfi({
-    locateFile,
-    onReceiveStdout: (msg) => self.postMessage({ type: 'stdout', data: msg }),
-    onReceiveStderr: (msg) => self.postMessage({ type: 'stderr', data: msg }),
-    onExit: (code) => self.postMessage({ type: 'exit', data: code }),
-    setStatus: (msg) => self.postMessage({ type: 'status', data: msg }),
-  });
-
-  self.postMessage({ type: 'ready' });
-}

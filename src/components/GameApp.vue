@@ -35,8 +35,7 @@
     <!-- 棋盘 -->
     <div class="board-stage">
       <div class="board-container">
-        <canvas ref="boardCanvas" width="600" height="600"
-          style="background-color:#EDC9A2;display:block"
+        <canvas ref="boardCanvas" class="gomoku-canvas"
           @click="handleClick" @touchstart.prevent="handleTouch" />
       </div>
     </div>
@@ -56,7 +55,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, onUnmounted, computed } from 'vue';
+import { ref, onMounted, watch, onUnmounted } from 'vue';
 import { useGame } from '../composables/useGame.js';
 
 const props = defineProps({
@@ -71,8 +70,6 @@ const {
 } = useGame();
 
 const boardCanvas = ref(null);
-const canvasSize = ref(480);
-const cellSize = computed(() => canvasSize.value / (BOARD_SIZE + 1));
 
 // 硬编码人机模式（AI 执白，玩家执黑）
 const aiMode = true;
@@ -91,71 +88,104 @@ watch([currentPlayer, aiThinking, gameOver], async ([cp, thinking, ended]) => {
   }
 });
 
-// ─── Canvas 渲染 ───
-function drawBoard() {
+const GRID_SIZE = BOARD_SIZE;
+const CELL_SIZE = 40;
+const MARGIN = 40;
+const BOARD_PX = CELL_SIZE * (GRID_SIZE - 1) + MARGIN * 2;
+let ctx = null;
+
+// ─── Canvas 渲染（视网膜 DPR 感知）───
+function initCanvas() {
   const canvas = boardCanvas.value;
   if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  const size = canvasSize.value;
-  const cs = cellSize.value;
+  ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = BOARD_PX * dpr;
+  canvas.height = BOARD_PX * dpr;
+  canvas.style.width = BOARD_PX + 'px';
+  canvas.style.height = BOARD_PX + 'px';
+  ctx.scale(dpr, dpr);
+  drawBoard();
+}
 
-  ctx.clearRect(0, 0, size, size);
-  ctx.fillStyle = '#c8a25c';
+function drawBoard() {
+  if (!ctx) return;
+  const size = BOARD_PX;
+
+  // 木纹底色
+  ctx.fillStyle = '#E3C193';
   ctx.fillRect(0, 0, size, size);
 
-  // 网格
-  ctx.strokeStyle = '#5a3e1b';
+  // 网格线
+  ctx.strokeStyle = '#000';
   ctx.lineWidth = 1;
-  for (let i = 0; i < BOARD_SIZE; i++) {
-    const pos = cs * (i + 1);
-    ctx.beginPath(); ctx.moveTo(cs, pos); ctx.lineTo(cs * BOARD_SIZE, pos); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(pos, cs); ctx.lineTo(pos, cs * BOARD_SIZE); ctx.stroke();
+  ctx.beginPath();
+  for (let i = 0; i < GRID_SIZE; i++) {
+    ctx.moveTo(MARGIN, MARGIN + i * CELL_SIZE);
+    ctx.lineTo(BOARD_PX - MARGIN, MARGIN + i * CELL_SIZE);
+    ctx.moveTo(MARGIN + i * CELL_SIZE, MARGIN);
+    ctx.lineTo(MARGIN + i * CELL_SIZE, BOARD_PX - MARGIN);
   }
+  ctx.stroke();
 
   // 星位
-  ctx.fillStyle = '#5a3e1b';
-  for (const r of [3, 7, 11])
-    for (const c of [3, 7, 11]) {
-      ctx.beginPath(); ctx.arc(cs * (c + 1), cs * (r + 1), 4, 0, Math.PI * 2); ctx.fill();
-    }
+  ctx.fillStyle = '#000';
+  for (const [r, c] of [[3,3],[11,3],[7,7],[3,11],[11,11]]) {
+    ctx.beginPath();
+    ctx.arc(MARGIN + c * CELL_SIZE, MARGIN + r * CELL_SIZE, 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   // 棋子
-  for (let r = 0; r < BOARD_SIZE; r++) {
-    for (let c = 0; c < BOARD_SIZE; c++) {
+  for (let r = 0; r < GRID_SIZE; r++) {
+    for (let c = 0; c < GRID_SIZE; c++) {
       const val = board[r][c];
       if (val === null) continue;
-      const x = cs * (c + 1);
-      const y = cs * (r + 1);
-      const rad = cs * 0.42;
-
-      ctx.beginPath(); ctx.arc(x, y, rad, 0, Math.PI * 2);
-      if (val === 1) {
-        const g = ctx.createRadialGradient(x - 3, y - 3, 2, x, y, rad);
-        g.addColorStop(0, '#555'); g.addColorStop(1, '#111');
-        ctx.fillStyle = g;
-      } else {
-        const g = ctx.createRadialGradient(x - 3, y - 3, 2, x, y, rad);
-        g.addColorStop(0, '#fff'); g.addColorStop(1, '#ccc');
-        ctx.fillStyle = g;
-      }
-      ctx.fill();
-      ctx.strokeStyle = val === 1 ? '#000' : '#999';
-      ctx.lineWidth = 1; ctx.stroke();
+      drawStone(r, c, val);
     }
   }
+}
+
+function drawStone(r, c, player) {
+  const x = MARGIN + c * CELL_SIZE;
+  const y = MARGIN + r * CELL_SIZE;
+  const radius = CELL_SIZE * 0.45;
+
+  ctx.shadowColor = 'rgba(0,0,0,0.4)';
+  ctx.shadowBlur = 4;
+  ctx.shadowOffsetX = 2;
+  ctx.shadowOffsetY = 2;
+
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  const grad = ctx.createRadialGradient(
+    x - radius * 0.3, y - radius * 0.3, radius * 0.1,
+    x, y, radius
+  );
+  if (player === 1) {
+    grad.addColorStop(0, '#666');
+    grad.addColorStop(1, '#000');
+  } else {
+    grad.addColorStop(0, '#fff');
+    grad.addColorStop(1, '#d1d1d1');
+  }
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 0;
 }
 
 // ─── 交互 ───
 function getGrid(clientX, clientY) {
   const rect = boardCanvas.value.getBoundingClientRect();
-  const sx = canvasSize.value / rect.width;
-  const sy = canvasSize.value / rect.height;
-  const x = (clientX - rect.left) * sx;
-  const y = (clientY - rect.top) * sy;
-  const cs = cellSize.value;
-  const col = Math.round(x / cs - 1);
-  const row = Math.round(y / cs - 1);
-  if (row < 0 || row >= BOARD_SIZE || col < 0 || col >= BOARD_SIZE) return null;
+  const x = clientX - rect.left;
+  const y = clientY - rect.top;
+  const col = Math.round((x - MARGIN) / CELL_SIZE);
+  const row = Math.round((y - MARGIN) / CELL_SIZE);
+  if (row < 0 || row >= GRID_SIZE || col < 0 || col >= GRID_SIZE) return null;
   return { row, col };
 }
 
@@ -183,28 +213,11 @@ function newGame() { resetGame(); }
 // 响应重绘
 watch([board, currentPlayer, gameOver], () => drawBoard(), { deep: true });
 
-let _resizeHandler = null;
-
 onMounted(() => {
-  // 闪光弹测试：确保 Canvas API 可用
-  if (boardCanvas.value) {
-    const ctx = boardCanvas.value.getContext('2d');
-    ctx.fillStyle = '#EDC9A2';
-    ctx.fillRect(0, 0, 600, 600);
-  }
-
-  _resizeHandler = () => {
-    const mx = Math.min(window.innerWidth - 32, window.innerHeight - 180, 560);
-    canvasSize.value = Math.max(240, mx);
-  };
-  _resizeHandler();
-  window.addEventListener('resize', _resizeHandler);
-  drawBoard();
+  initCanvas();
 });
 
-onUnmounted(() => {
-  if (_resizeHandler) window.removeEventListener('resize', _resizeHandler);
-});
+onUnmounted(() => {});
 </script>
 
 <style scoped>
@@ -275,6 +288,7 @@ onUnmounted(() => {
   box-shadow: 0 20px 50px rgba(0,0,0,.6); border-radius: 4px; line-height: 0;
 }
 .board-container canvas { display: block; border-radius: 4px; }
+.gomoku-canvas { display: block; background: #E3C193; }
 
 .control-dock {
   padding-bottom: env(safe-area-inset-bottom, 20px); margin-bottom: 16px;
