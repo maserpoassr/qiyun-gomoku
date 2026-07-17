@@ -19,7 +19,7 @@ self.Module = {
   },
 };
 
-// 2. 同步装载底层引擎胶水代码
+// 2. 装载底层引擎胶水代码
 try {
   importScripts('/build/rapfi-multi-simd128.js');
 } catch (e) {
@@ -30,67 +30,48 @@ try {
   }
 }
 
-// 3. 【核心】保存 Emscripten 原生的消息处理器（用于管理多线程 Pthreads）
+// 3. 【最关键】保存 Emscripten 原生的消息监听器
 const emscriptenOnMessage = self.onmessage;
 
-// 4. 初始化引擎实例（在 importScripts 完成后执行）
-let rapfi = null;
-
+// 4. 初始化引擎（必须等待 async 初始化完成）
 if (typeof self.Rapfi !== 'undefined') {
   self.Rapfi({
     locateFile: self.Module.locateFile,
     print: self.Module.print,
     printErr: self.Module.printErr,
   })
-    .then(function (instance) {
-      rapfi = instance;
+    .then(function () {
       self.postMessage({ type: 'ready' });
     })
     .catch(function (err) {
-      console.error('[Worker] Rapfi 初始化失败:', err);
       self.postMessage({ type: 'error', data: err.message });
     });
 } else {
   self.postMessage({ type: 'error', data: 'Rapfi 构造函数未定义' });
 }
 
-// 5. 【核心修复】安全钩子拦截器 — 不阻塞 Pthread 内部信号
+// 5. 安全代理钩子：解构后全量转发给 Emscripten 原生处理器
 self.onmessage = function (event) {
   const data = event.data;
   if (!data) return;
 
-  // 判定是否为我们派发的五子棋游戏指令
-  let cmdStr = '';
-
-  if (typeof data === 'string') {
-    // 我们的指令以 YX / GO / INFO 开头
-    if (data.startsWith('YX') || data === 'GO' || data.startsWith('INFO')) {
-      cmdStr = data;
-    }
-  } else if (data.cmd) {
-    cmdStr = data.cmd;
-  } else if (data.data && typeof data.data === 'string') {
-    if (
-      data.data.startsWith('YX') ||
-      data.data === 'GO' ||
-      data.data.startsWith('INFO')
-    ) {
-      cmdStr = data.data;
-    }
-  }
-
-  if (cmdStr) {
-    // 游戏指令，喂给 WASM 引擎
-    if (rapfi && rapfi.sendCommand) {
-      rapfi.sendCommand(cmdStr);
-    } else if (self.Module && self.Module.ccall) {
-      self.Module.ccall('Command', 'void', ['string'], [cmdStr]);
+  if (emscriptenOnMessage) {
+    // 兼容多格式转发:
+    //   { cmd: 'run', ... }    → Emscripten Pthread 信号, 原封不动
+    //   { type: 'command', data: 'GO' } → 游戏指令, 解出纯字符串
+    //   纯字符串 'GO'          → 直接转发
+    if (data.cmd) {
+      // Emscripten 内部线程信号（cmd 格式），原封不动
+      emscriptenOnMessage(event);
+    } else if (typeof data === 'object' && data.type === 'command' && typeof data.data === 'string') {
+      // 游戏指令对象 → 解构为纯字符串转发给 C++ stdin
+      const syntheticEvent = { ...event, data: data.data };
+      emscriptenOnMessage(syntheticEvent);
+    } else if (typeof data === 'string') {
+      // 已经是纯字符串 → 直接转发
+      emscriptenOnMessage(event);
     } else {
-      console.warn('[Worker] 引擎未就绪，暂存指令:', cmdStr);
-    }
-  } else {
-    // 非游戏指令 → 原封不动转发给 Emscripten 原生处理器（Pthread 信号等）
-    if (emscriptenOnMessage) {
+      // 其他格式（如 type:'ready'/type:'error'），原封不动
       emscriptenOnMessage(event);
     }
   }
