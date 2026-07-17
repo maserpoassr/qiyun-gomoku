@@ -10,43 +10,34 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#1a1a1a">
 <title>棋韵 - 五子棋AI对弈</title>
-<script>// 防御性补丁：确保旧版 Vue 2 产物中 $t 永不缺失（终极版）
-// 方案1: Object.prototype 拦截
-(function(){try{Object.defineProperty(Object.prototype,'$t',{configurable:true,get:function(){var self=this;return function(k){return self._t?.(k)||k}},set:function(v){Object.defineProperty(this,'$t',{configurable:true,writable:true,value:v})}})}catch(e){}})();
-// 方案2: 全局兜底
-window.$t=function(k){return k};
-// 方案3: 吞掉 $t 相关运行时错误
-window.addEventListener('error',function(e){if(e.message&&e.message.indexOf('$t')>=0){e.preventDefault();console.warn('[i18n] 已拦截 $t 报错')}});
-window.addEventListener('unhandledrejection',function(e){if(e.reason&&e.reason.message&&e.reason.message.indexOf('$t')>=0){e.preventDefault();console.warn('[i18n] 已拦截 $t Promise 报错')}});
-</script>
+
+<!-- Vue 3 入口 -->
+<script type="module" src="/src/main.js"></script>
+
+<!-- $t 补丁（安全兜底，新架构不需要但保留无害） -->
+<script>window.$t=function(k){return k};window.addEventListener('error',function(e){if(e.message&&e.message.indexOf('$t')>=0){e.preventDefault()}});</script>
+
 <meta name="description" content="棋韵 - 智能五子棋对弈平台">
 <meta name="apple-mobile-web-app-title" content="棋韵">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
 <link rel="apple-touch-icon" href="/icon.png">
 <link rel="stylesheet" href="/css/font-awesome.min.css" media="print" onload="this.media='all'">
-<style>:root{--bg-color:#1a1a1a;--accent-color:#d4af37;--text-color:#e0e0e0}
-body,html{margin:0;padding:0;height:100%;background-color:var(--bg-color);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased}</style>
-<link href="/css/app.e48d05d7.css" rel="preload" as="style">
-<link href="/css/chunk-vendors.9f0f81a9.css" rel="preload" as="style">
-<link href="/js/app.815f6a6d.js" rel="preload" as="script">
-<link href="/js/chunk-vendors.906392e8.js" rel="preload" as="script">
-<link href="/css/chunk-vendors.9f0f81a9.css" rel="stylesheet">
-<link href="/css/app.e48d05d7.css" rel="stylesheet">
+<style>
+:root{--bg-dark:#121212;--gold-primary:#d4af37;--text-main:#e8e8e8}
+body,html{margin:0;padding:0;height:100%;background-color:var(--bg-dark);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased}
+</style>
 <link rel="manifest" href="/manifest.json">
 </head>
 <body>
 <noscript><div style="color:#fff;text-align:center;padding-top:50px"><strong>请开启 JavaScript 以获得最佳对弈体验</strong></div></noscript>
 
-<!-- Vue 3 引擎加载屏（覆盖在 Vue 2 之上） -->
+<!-- Vue 3 棋盘挂载点 -->
 <div id="gomoku-root"></div>
 
-<!-- Vue 2 旧 App 挂载点 -->
-<div id="app"></div>
+<!-- 旧 Vue 2 容器（保留作为兼容桩，新架构不使用） -->
+<div id="app" style="display:none"></div>
 
-<script async src="/lib/gif.js"></script>
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-WSNZ3J3X2V"></script>
 <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','G-WSNZ3J3X2V')</script>
-<script src="/js/chunk-vendors.906392e8.js"></script>
-<script src="/js/app.815f6a6d.js"></script>
 </body>
 </html>
