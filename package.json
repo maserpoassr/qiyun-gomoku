@@ -1,0 +1,21 @@
+{
+  "name": "qiyun-gomoku",
+  "version": "2.0.0",
+  "private": true,
+  "description": "棋韵 - 五子棋AI对弈平台 (Vite + Vue 3)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "deploy": "vite build && wrangler pages deploy dist --project-name=qiyun-gomoku"
+  },
+  "dependencies": {
+    "localforage": "^1.10.0",
+    "vue": "^3.4.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.0",
+    "vite": "^5.4.0"
+  }
+}

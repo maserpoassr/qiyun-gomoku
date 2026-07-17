@@ -1,0 +1,74 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="renderer" content="webkit"><meta name="force-rendering" content="webkit"><meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=1"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="theme-color" content="#1a1a1a"><title>棋韵 - 五子棋AI对弈</title><meta name="description" content="棋韵 - 智能五子棋对弈平台"><meta name="apple-mobile-web-app-title" content="棋韵"><!--[if IE]><link rel="icon" type="image/svg+xml" href="/favicon.svg"><![endif]--><link rel="icon" type="image/png" sizes="32x32" href="/favicon.png"><link rel="apple-touch-icon" href="/icon.png"><link rel="stylesheet" href="/css/font-awesome.min.css" media="print" onload="this.media='all'"><style>:root {
+        --bg-color: #1a1a1a;
+        --accent-color: #d4af37; /* 香槟金，高级感的代表色 */
+        --text-color: #e0e0e0;
+      }
+      
+      body, html {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        background-color: var(--bg-color);
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        overflow: hidden;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* 启动屏容器 */
+      #loading-screen {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: radial-gradient(circle at center, #2a2a2a 0%, #1a1a1a 100%);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        transition: opacity 0.5s ease-out;
+      }
+
+      /* Logo 区域 */
+      .loader-logo {
+        font-size: 28px;
+        font-weight: 300;
+        color: var(--text-color);
+        margin-bottom: 20px;
+        letter-spacing: 8px;
+      }
+      .loader-logo span {
+        font-weight: 700;
+        color: var(--accent-color);
+      }
+
+      /* 极简呼吸灯加载条 */
+      .loader-bar {
+        width: 120px;
+        height: 2px;
+        background: rgba(255,255,255,0.1);
+        position: relative;
+        overflow: hidden;
+        border-radius: 2px;
+      }
+      .loader-bar::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        width: 0%;
+        background: var(--accent-color);
+        animation: loading 2s cubic-bezier(0.22, 0.61, 0.36, 1) infinite;
+        box-shadow: 0 0 10px var(--accent-color);
+      }
+
+      @keyframes loading {
+        0% { width: 0%; left: 0; opacity: 1; }
+        50% { width: 100%; left: 0; opacity: 1; }
+        100% { width: 100%; left: 100%; opacity: 0; }
+      }</style><link href="/css/app.e48d05d7.css" rel="preload" as="style"><link href="/css/chunk-vendors.9f0f81a9.css" rel="preload" as="style"><link href="/js/app.815f6a6d.js" rel="preload" as="script"><link href="/js/chunk-vendors.906392e8.js" rel="preload" as="script"><link href="/css/chunk-vendors.9f0f81a9.css" rel="stylesheet"><link href="/css/app.e48d05d7.css" rel="stylesheet"><link rel="icon" type="image/png" sizes="32x32" href="/img/icons/favicon-32x32.png"><link rel="icon" type="image/png" sizes="16x16" href="/img/icons/favicon-16x16.png"><link rel="manifest" href="/manifest.json"><meta name="theme-color" content="#1a1a2e"><meta name="apple-mobile-web-app-capable" content="no"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="apple-mobile-web-app-title" content="Gomoku AI"><link rel="apple-touch-icon" href="/img/icons/apple-touch-icon-152x152.png"><link rel="mask-icon" href="/img/icons/safari-pinned-tab.svg" color="#1a1a2e"><meta name="msapplication-TileImage" content="/img/icons/msapplication-icon-144x144.png"><meta name="msapplication-TileColor" content="#1a1a2e"></head><body><noscript><div style="color: #fff; text-align: center; padding-top: 50px;"><strong>为了获得最佳对弈体验，请开启 JavaScript 支持。</strong></div></noscript><div id="loading-screen"><div class="loader-logo">棋<span>韵</span></div><div class="loader-bar"></div></div><div id="app"></div><script async src="/lib/gif.js"></script><script async src="https://www.googletagmanager.com/gtag/js?id=G-WSNZ3J3X2V"></script><script>window.dataLayer = window.dataLayer || []
+      function gtag() { dataLayer.push(arguments) }
+      gtag('js', new Date())
+      gtag('config', 'G-WSNZ3J3X2V')</script><script src="/js/chunk-vendors.906392e8.js"></script><script src="/js/app.815f6a6d.js"></script></body></html>
