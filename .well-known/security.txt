@@ -1,0 +1,8 @@
+# Security Policy
+# This website is a personal gomoku AI game project.
+# For security concerns, please contact the repository owner.
+# No bug bounty program is currently available.
+
+Contact: https://github.com/your-repo/security
+Preferred-Languages: zh, en
+Policy: https://github.com/your-repo/security/policy

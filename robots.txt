@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://5.hfive.ggff.net/sitemap.xml

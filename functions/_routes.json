@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "routes": [
+    {
+      "pattern": "/model/*",
+      "script": "model"
+    }
+  ]
+}
