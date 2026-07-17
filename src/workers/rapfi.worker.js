@@ -1,10 +1,9 @@
 // src/workers/rapfi.worker.js
 
-// 状态控制：WASM 运行时是否完全就绪
+// 状态控制
 let isWasmReady = false;
 const commandQueue = [];
 
-// 释放并执行队列中的积压指令
 function executeQueue() {
   if (!isWasmReady || !self.Module.ccall) return;
   while (commandQueue.length > 0) {
@@ -13,7 +12,6 @@ function executeQueue() {
   }
 }
 
-// 统一执行 C++ 核心调用
 function callEngine(cmdStr) {
   try {
     self.Module.ccall('sendCommand', 'void', ['string'], [cmdStr]);
@@ -26,45 +24,63 @@ function callEngine(cmdStr) {
   }
 }
 
-// 1. 强制劫持底层 WebAssembly 的文件加载路由
-self.Module = {
-  locateFile: function (path, scriptDirectory) {
-    if (path.endsWith('.data')) {
-      return '/model/rapfi.data';
-    }
-    if (path.endsWith('.wasm')) {
-      return '/build/' + path;
-    }
-    return (scriptDirectory || '/build/') + path;
-  },
-  print: function (text) {
-    self.postMessage({ type: 'stdout', msg: text });
-  },
-  printErr: function (text) {
-    self.postMessage({ type: 'stderr', msg: text });
-  },
-  onRuntimeInitialized: function () {
-    isWasmReady = true;
-    self.postMessage({ type: 'ready' });
-    executeQueue();
-  },
+// ==========================================
+// 【核心修复】安全初始化 self.Module，严禁覆盖原有属性
+// Emscripten 在多线程模式下会预注入线程配置（thread ID、pthread 句柄等）
+// 直接自赋值会清空这些参数，导致子线程死锁
+// ==========================================
+self.Module = self.Module || {};
+
+// 安全包装 locateFile
+const origLocateFile = self.Module.locateFile;
+self.Module.locateFile = function (path, scriptDirectory) {
+  if (path.endsWith('.data')) return '/model/rapfi.data';
+  if (path.endsWith('.wasm')) return '/build/' + path;
+  return origLocateFile
+    ? origLocateFile(path, scriptDirectory)
+    : (scriptDirectory || '/build/') + path;
 };
 
-// 2. 动态同步装载底层引擎胶水代码
+// 安全包装输出流
+const origPrint = self.Module.print;
+self.Module.print = function (text) {
+  self.postMessage({ type: 'stdout', msg: text });
+  if (origPrint) origPrint(text);
+};
+
+const origPrintErr = self.Module.printErr;
+self.Module.printErr = function (text) {
+  self.postMessage({ type: 'stderr', msg: text });
+  if (origPrintErr) origPrintErr(text);
+};
+
+// 安全包装初始化完成回调
+const origOnInit = self.Module.onRuntimeInitialized;
+self.Module.onRuntimeInitialized = function () {
+  isWasmReady = true;
+  self.postMessage({ type: 'ready' });
+  executeQueue();
+  if (origOnInit) origOnInit();
+};
+
+// ==========================================
+// 加载引擎核心
+// ==========================================
 try {
   importScripts('/build/rapfi-multi-simd128.js');
 } catch (e) {
   try {
     importScripts('/build/rapfi-single.js');
   } catch (err) {
-    console.error('[Worker] 所有引擎脚本加载失败');
+    console.error('[Worker] 所有引擎加载失败');
   }
 }
 
-// 保存 Emscripten 原生的消息监听器
+// ==========================================
+// 安全包装消息接收器，保留子线程同步通道
+// ==========================================
 const emscriptenOnMessage = self.onmessage;
 
-// 3. 接收并处理主线程指令
 self.onmessage = function (event) {
   const data = event.data;
   if (!data) return;
@@ -92,7 +108,7 @@ self.onmessage = function (event) {
       commandQueue.push(cmdStr);
     }
   } else {
-    // 转发原生多线程同步信号，绝不拦截
+    // 子线程同步信号等，原封不动交还给 Emscripten
     if (emscriptenOnMessage) {
       emscriptenOnMessage(event);
     }
