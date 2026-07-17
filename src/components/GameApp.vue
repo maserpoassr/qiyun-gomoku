@@ -49,9 +49,6 @@
         <button class="dock-btn" @click="newGame">
           <div class="icon-circle gold">⟳</div><span>新局</span>
         </button>
-        <button class="dock-btn" @click="toggleAIMode">
-          <div class="icon-circle green">🤖</div><span>{{ aiMode ? '人机' : '双人' }}</span>
-        </button>
       </div>
     </div>
   </div>
@@ -73,9 +70,11 @@ const {
 } = useGame();
 
 const boardCanvas = ref(null);
-const aiMode = ref(true);
 const canvasSize = ref(480);
 const cellSize = computed(() => canvasSize.value / (BOARD_SIZE + 1));
+
+// 硬编码人机模式（AI 执白，玩家执黑）
+const aiMode = true;
 
 // 同步外部 engineReady
 watch(() => props.engineReady, (v) => {
@@ -85,7 +84,7 @@ watch(() => props.engineReady, (v) => {
 // ─── AI 自动走棋 ───
 watch([currentPlayer, aiThinking, gameOver], async ([cp, thinking, ended]) => {
   if (ended || thinking || !engineReady.value) return;
-  if (aiMode.value && cp === -1) {
+  if (aiMode && cp === -1) {
     // AI 回合（白棋）
     await doAIMove();
   }
@@ -162,7 +161,7 @@ function getGrid(clientX, clientY) {
 function handleClick(e) {
   const pos = getGrid(e.clientX, e.clientY);
   if (!pos) return;
-  if (aiMode.value && currentPlayer.value === -1) return;
+  if (aiMode && currentPlayer.value === -1) return;
   placeStone(pos.row, pos.col);
 }
 
@@ -170,16 +169,12 @@ function handleTouch(e) {
   const t = e.touches[0];
   const pos = getGrid(t.clientX, t.clientY);
   if (!pos) return;
-  if (aiMode.value && currentPlayer.value === -1) return;
+  if (aiMode && currentPlayer.value === -1) return;
   placeStone(pos.row, pos.col);
 }
 
 function undoMove() {
-  undoOne(aiMode.value);
-}
-
-function toggleAIMode() {
-  aiMode.value = !aiMode.value;
+  undoOne(aiMode);
 }
 
 function newGame() { resetGame(); }
@@ -187,18 +182,20 @@ function newGame() { resetGame(); }
 // 响应重绘
 watch([board, currentPlayer, gameOver], () => drawBoard(), { deep: true });
 
+let _resizeHandler = null;
+
 onMounted(() => {
-  function resize() {
+  _resizeHandler = () => {
     const mx = Math.min(window.innerWidth - 32, window.innerHeight - 180, 560);
     canvasSize.value = Math.max(240, mx);
-  }
-  resize();
-  window.addEventListener('resize', resize);
+  };
+  _resizeHandler();
+  window.addEventListener('resize', _resizeHandler);
   drawBoard();
 });
 
 onUnmounted(() => {
-  window.removeEventListener('resize', resize);
+  if (_resizeHandler) window.removeEventListener('resize', _resizeHandler);
 });
 </script>
 

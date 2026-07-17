@@ -54,12 +54,9 @@ async function initEngine({ variant, modelURL }) {
     return `${basePath}${filename}`;
   };
 
-  // 初始化引擎
+  // 初始化引擎 — 不使用自定义 wasmMemory，Rapfi 内部自动处理
   rapfi = await self.Rapfi({
     locateFile,
-    wasmMemory: data?.memoryArgs
-      ? new WebAssembly.Memory(data.memoryArgs)
-      : undefined,
     onReceiveStdout: (msg) => self.postMessage({ type: 'stdout', data: msg }),
     onReceiveStderr: (msg) => self.postMessage({ type: 'stderr', data: msg }),
     onExit: (code) => self.postMessage({ type: 'exit', data: code }),
