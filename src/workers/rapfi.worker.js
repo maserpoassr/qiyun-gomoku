@@ -1,5 +1,31 @@
 // src/workers/rapfi.worker.js
 
+// 状态控制：WASM 运行时是否完全就绪
+let isWasmReady = false;
+const commandQueue = [];
+
+// 释放并执行队列中的积压指令
+function executeQueue() {
+  if (!isWasmReady || !self.Module.ccall) return;
+  while (commandQueue.length > 0) {
+    const cmd = commandQueue.shift();
+    callEngine(cmd);
+  }
+}
+
+// 统一执行 C++ 核心调用
+function callEngine(cmdStr) {
+  try {
+    self.Module.ccall('sendCommand', 'void', ['string'], [cmdStr]);
+  } catch (e) {
+    try {
+      self.Module.ccall('Command', 'void', ['string'], [cmdStr]);
+    } catch (err) {
+      console.error('[Worker] 引擎调用失败:', cmdStr, err);
+    }
+  }
+}
+
 // 1. 强制劫持底层 WebAssembly 的文件加载路由
 self.Module = {
   locateFile: function (path, scriptDirectory) {
@@ -17,61 +43,57 @@ self.Module = {
   printErr: function (text) {
     self.postMessage({ type: 'stderr', msg: text });
   },
+  onRuntimeInitialized: function () {
+    isWasmReady = true;
+    self.postMessage({ type: 'ready' });
+    executeQueue();
+  },
 };
 
-// 2. 装载底层引擎胶水代码
+// 2. 动态同步装载底层引擎胶水代码
 try {
   importScripts('/build/rapfi-multi-simd128.js');
 } catch (e) {
   try {
     importScripts('/build/rapfi-single.js');
-  } catch (e2) {
-    console.error('[Worker] 所有引擎变体均加载失败');
+  } catch (err) {
+    console.error('[Worker] 所有引擎脚本加载失败');
   }
 }
 
-// 3. 【最关键】保存 Emscripten 原生的消息监听器
+// 保存 Emscripten 原生的消息监听器
 const emscriptenOnMessage = self.onmessage;
 
-// 4. 初始化引擎（必须等待 async 初始化完成）
-if (typeof self.Rapfi !== 'undefined') {
-  self.Rapfi({
-    locateFile: self.Module.locateFile,
-    print: self.Module.print,
-    printErr: self.Module.printErr,
-  })
-    .then(function () {
-      self.postMessage({ type: 'ready' });
-    })
-    .catch(function (err) {
-      self.postMessage({ type: 'error', data: err.message });
-    });
-} else {
-  self.postMessage({ type: 'error', data: 'Rapfi 构造函数未定义' });
-}
-
-// 5. 安全代理钩子：解构后全量转发给 Emscripten 原生处理器
+// 3. 接收并处理主线程指令
 self.onmessage = function (event) {
   const data = event.data;
   if (!data) return;
 
-  if (emscriptenOnMessage) {
-    // 兼容多格式转发:
-    //   { cmd: 'run', ... }    → Emscripten Pthread 信号, 原封不动
-    //   { type: 'command', data: 'GO' } → 游戏指令, 解出纯字符串
-    //   纯字符串 'GO'          → 直接转发
-    if (data.cmd) {
-      // Emscripten 内部线程信号（cmd 格式），原封不动
-      emscriptenOnMessage(event);
-    } else if (typeof data === 'object' && data.type === 'command' && typeof data.data === 'string') {
-      // 游戏指令对象 → 解构为纯字符串转发给 C++ stdin
-      const syntheticEvent = { ...event, data: data.data };
-      emscriptenOnMessage(syntheticEvent);
-    } else if (typeof data === 'string') {
-      // 已经是纯字符串 → 直接转发
-      emscriptenOnMessage(event);
+  let cmdStr = '';
+  let isGameCommand = false;
+
+  if (typeof data === 'string') {
+    cmdStr = data;
+    if (data.startsWith('YX') || data === 'GO' || data.startsWith('INFO')) {
+      isGameCommand = true;
+    }
+  } else if (data.cmd) {
+    cmdStr = data.cmd;
+    isGameCommand = true;
+  } else if (data.type === 'command' && typeof data.data === 'string') {
+    cmdStr = data.data;
+    isGameCommand = true;
+  }
+
+  if (isGameCommand && cmdStr) {
+    if (isWasmReady && self.Module.ccall) {
+      callEngine(cmdStr);
     } else {
-      // 其他格式（如 type:'ready'/type:'error'），原封不动
+      commandQueue.push(cmdStr);
+    }
+  } else {
+    // 转发原生多线程同步信号，绝不拦截
+    if (emscriptenOnMessage) {
       emscriptenOnMessage(event);
     }
   }
