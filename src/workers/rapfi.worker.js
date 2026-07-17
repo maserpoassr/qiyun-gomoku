@@ -77,16 +77,38 @@ try {
 }
 
 // 【关键】显式调用 Rapfi() 初始化 WASM 运行时
-// importScripts 只加载胶水代码，不启动 WASM 编译
+// 使用旧版兼容的 callback 命名（onReceiveStdout/Stderr, setStatus）
 if (typeof self.Rapfi !== 'undefined') {
   self.Rapfi({
     locateFile: self.Module.locateFile,
-    print: self.Module.print,
-    printErr: self.Module.printErr,
+    onReceiveStdout: function (text) {
+      self.postMessage({ type: 'stdout', msg: text });
+    },
+    onReceiveStderr: function (text) {
+      self.postMessage({ type: 'stderr', msg: text });
+    },
+    setStatus: function (text) {
+      if (text === 'Running...' || text === '') return;
+      self.postMessage({ type: 'status', msg: text });
+    },
+    onExit: function (code) {
+      self.postMessage({ type: 'exit', data: code });
+    },
+  }).then(function () {
+    if (!isWasmReady) {
+      isWasmReady = true;
+      self.postMessage({ type: 'ready' });
+      executeQueue();
+    }
   }).catch(function (err) {
-    console.error('[Worker] Rapfi 初始化失败:', err);
-    self.postMessage({ type: 'error', data: err.message });
+    self.postMessage({ type: 'error', data: err.message || String(err) });
   });
+  // 安全兜底
+  setTimeout(function () {
+    if (!isWasmReady) {
+      self.postMessage({ type: 'error', data: 'Worker WASM 初始化超时（60s）' });
+    }
+  }, 60000);
 } else {
   self.postMessage({ type: 'error', data: 'Rapfi 构造函数未定义' });
 }
